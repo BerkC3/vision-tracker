@@ -44,7 +44,7 @@ configs/
 **Prerequisites:** Python 3.10+, NVIDIA GPU with CUDA 12.4 (recommended)
 
 ```bash
-git clone https://github.com/<berkc3>/vision-track.git
+git clone https://github.com/berkc3/vision-track.git
 cd vision-track
 python -m venv venv
 venv\Scripts\activate        # Windows
