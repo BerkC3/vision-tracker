@@ -62,7 +62,7 @@ def main() -> None:
         st.divider()
         st.subheader("Detection")
         confidence = st.slider("Confidence", 0.1, 1.0, config["model"]["confidence"], 0.05)
-        model_size = st.selectbox("Model", ["yolov8n.pt", "yolov8s.pt", "yolov8m.pt", "yolov8l.pt"])
+        model_size = st.selectbox("Model", ["yolov8n.pt", "yolov8s.pt", "yolov8m.pt", "yolov8l.pt", "yolov8x.pt"])
         imgsz = st.selectbox("Inference Resolution", [640, 1280, 1920], index=2)
 
         st.divider()
