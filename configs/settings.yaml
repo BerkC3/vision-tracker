@@ -1,0 +1,41 @@
+model:
+  path: "yolov8x.pt"
+  confidence: 0.4
+  iou_threshold: 0.5
+  device: "auto"  # auto | cpu | cuda | cuda:0
+  imgsz: 1920     # inference resolution (640, 1280, 1920) - RTX 4080 Super handles 1920
+  classes: [2, 3, 5, 7]  # COCO: car, motorcycle, bus, truck
+
+tracker:
+  type: "botsort"  # botsort | bytetrack
+  track_high_thresh: 0.5
+  track_low_thresh: 0.1
+  new_track_thresh: 0.6
+  track_buffer: 30
+  match_thresh: 0.8
+
+speed:
+  line1_y_ratio: 0.4          # default fallback (fraction of frame height)
+  line2_y_ratio: 0.65
+  real_distance_m: 15.0       # real-world distance between lines (meters)
+  smoothing_window: 5
+  calibration_mode: true      # true = show first frame and let user draw lines interactively
+
+violation:
+  roi_polygon: []  # set via UI or here as [[x1,y1],[x2,y2],...]
+  cooldown_seconds: 3.0
+
+display:
+  show_trails: true
+  trail_length: 30
+  show_speed: true
+  show_roi: true
+  box_thickness: 2
+  font_scale: 0.6
+  stats_opacity: 0.35  # stats panel background opacity (0.0=invisible, 1.0=opaque)
+
+output:
+  save_video: true
+  save_violations: true
+  output_dir: "outputs"
+  codec: "mp4v"

@@ -1,0 +1,39 @@
+# Python virtual environment
+tracker/
+venv/
+.venv/
+env/
+
+# YOLO model weights (user downloads via ultralytics)
+*.pt
+
+# Video files (too large for git)
+*.mp4
+*.avi
+*.mov
+*.mkv
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Personal docs
+EDUCATIONAL_DOCS.md
+PROJECT_DEEP_DIVE.md
+
+# Outputs
+outputs/
+runs/
+
