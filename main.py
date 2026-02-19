@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import logging
 import time
+from datetime import datetime
 
 import cv2
 import yaml
@@ -54,15 +55,21 @@ def run(source: str | int, config: dict, output_path: str | None = None, show: b
     video.open()
     h, w = video.height, video.width
 
-    # Read first frame for calibration
-    first_frame = None
-    for frame in video.frames():
-        first_frame = frame
-        break
+    # Grab a stable frame for calibration (skip initial seconds to avoid camera shake)
+    skip_seconds = speed_cfg.get("calibration_skip_seconds", 0)
+    skip_frames = int(skip_seconds * (video.fps or 25.0))
+    calib_frame = None
+    for i, frame in enumerate(video.frames()):
+        if i >= skip_frames:
+            calib_frame = frame
+            break
 
-    if first_frame is None:
-        logger.error("Cannot read first frame.")
+    if calib_frame is None:
+        logger.error("Cannot read calibration frame.")
         return
+
+    max_w = disp_cfg.get("max_w", 1920)
+    max_h = disp_cfg.get("max_h", 1080)
 
     # Speed paths calibration
     if test_mode:
@@ -73,7 +80,7 @@ def run(source: str | int, config: dict, output_path: str | None = None, show: b
         path1, path2 = _default_paths(h, w, config)
         if speed_cfg.get("calibration_mode", False) and show:
             calibrator = PathCalibrator()
-            result = calibrator.calibrate(first_frame)
+            result = calibrator.calibrate(calib_frame, max_w=max_w, max_h=max_h)
             if result is not None:
                 path1, path2 = result
                 logger.info("Using user-drawn speed paths")
@@ -95,11 +102,18 @@ def run(source: str | int, config: dict, output_path: str | None = None, show: b
         roi_polygons = [cfg_roi] if cfg_roi and isinstance(cfg_roi[0], list) and not isinstance(cfg_roi[0][0], list) else cfg_roi
     if not roi_polygons and show and not test_mode:
         roi_cal = ROICalibrator()
-        roi_polygons = roi_cal.calibrate(first_frame)
+        roi_polygons = roi_cal.calibrate(calib_frame, max_w=max_w, max_h=max_h)
+
+    out_cfg = config.get("output", {})
+    violations_file = None
+    if out_cfg.get("save_violations", True):
+        out_dir = out_cfg.get("output_dir", "outputs")
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        violations_file = f"{out_dir}/violations_{ts}.csv"
 
     violation_det = LaneViolationDetector(
         roi_polygons=roi_polygons,
-        cooldown_seconds=viol_cfg["cooldown_seconds"],
+        violations_file=violations_file,
     )
 
     renderer = OverlayRenderer(
@@ -116,7 +130,7 @@ def run(source: str | int, config: dict, output_path: str | None = None, show: b
         writer = VideoWriter(output_path, video.fps, w, h)
 
     cv2.namedWindow("Vision-Track", cv2.WINDOW_NORMAL)
-    cv2.resizeWindow("Vision-Track", min(w, 1920), min(h, 1080))
+    cv2.resizeWindow("Vision-Track", min(w, max_w), min(h, max_h))
     logger.info("Pipeline started. Press 'q' to quit.")
     frame_count = 0
     video_fps = video.fps or 25.0

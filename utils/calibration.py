@@ -19,8 +19,12 @@ def _enable_dpi_awareness() -> None:
             pass
 
 
-def _fit_display(frame: np.ndarray, max_w: int = 1400, max_h: int = 800) -> tuple[np.ndarray, float]:
-    """Resize frame to fit display, return (resized_frame, scale_factor)."""
+def _fit_display(frame: np.ndarray, max_w: int = 1920, max_h: int = 1080) -> tuple[np.ndarray, float]:
+    """Resize frame to fit display, return (resized_frame, scale_factor).
+
+    Defaults to 1920×1080 so that a standard 1080p source uses scale=1.0,
+    meaning mouse coordinates map 1-to-1 onto the original frame pixels.
+    """
     h, w = frame.shape[:2]
     if w <= max_w and h <= max_h:
         return frame.copy(), 1.0
@@ -47,6 +51,8 @@ class PathCalibrator:
         self._display: np.ndarray | None = None
         self._scale: float = 1.0
         self._done = False
+        self._max_w: int = 1920
+        self._max_h: int = 1080
 
     def _to_orig(self, x: int, y: int) -> tuple[int, int]:
         return int(x / self._scale), int(y / self._scale)
@@ -67,7 +73,7 @@ class PathCalibrator:
             self._redraw()
 
     def _redraw(self) -> None:
-        self._display, _ = _fit_display(self._frame, 1400, 800)
+        self._display, _ = _fit_display(self._frame, self._max_w, self._max_h)
         self._draw_instructions(self._display)
 
         # Path 1 (green)
@@ -117,17 +123,21 @@ class PathCalibrator:
         cv2.putText(img, "'c' = confirm  |  'r' = reset  |  'q' = skip (use defaults)", (pad, y0 + line_h * 3),
                     cv2.FONT_HERSHEY_SIMPLEX, font_hint, (200, 200, 200), thick_body)
 
-    def calibrate(self, frame: np.ndarray) -> tuple[list[tuple[int, int]], list[tuple[int, int]]] | None:
+    def calibrate(self, frame: np.ndarray, max_w: int = 1920, max_h: int = 1080) -> tuple[list[tuple[int, int]], list[tuple[int, int]]] | None:
         _enable_dpi_awareness()
+        self._max_w = max_w
+        self._max_h = max_h
         self._frame = frame.copy()
-        self._display, self._scale = _fit_display(frame, 1400, 800)
+        self._display, self._scale = _fit_display(frame, self._max_w, self._max_h)
         self._draw_instructions(self._display)
         self._path1.clear()
         self._path2.clear()
         self._done = False
 
         win = "Vision-Track | Speed Path Calibration"
-        cv2.namedWindow(win, cv2.WINDOW_AUTOSIZE)
+        cv2.namedWindow(win, cv2.WINDOW_NORMAL)
+        dh, dw = self._display.shape[:2]
+        cv2.resizeWindow(win, dw, dh)
         cv2.setMouseCallback(win, self._mouse_cb)
 
         while True:
@@ -185,6 +195,8 @@ class ROICalibrator:
         self._display: np.ndarray | None = None
         self._scale: float = 1.0
         self._current_done = False
+        self._max_w: int = 1920
+        self._max_h: int = 1080
 
     def _to_orig(self, x: int, y: int) -> tuple[int, int]:
         return int(x / self._scale), int(y / self._scale)
@@ -207,7 +219,7 @@ class ROICalibrator:
             self._current_done = True
 
     def _redraw(self) -> None:
-        self._display, _ = _fit_display(self._frame, 1400, 800)
+        self._display, _ = _fit_display(self._frame, self._max_w, self._max_h)
         self._draw_instructions(self._display)
         # Draw completed ROIs
         for i, poly in enumerate(self._completed):
@@ -262,17 +274,21 @@ class ROICalibrator:
             cv2.putText(img, f"ROI #{label_num}", (disp_pts[0][0] + 8, disp_pts[0][1] - 10),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
 
-    def calibrate(self, frame: np.ndarray) -> list[list[list[int]]] | None:
+    def calibrate(self, frame: np.ndarray, max_w: int = 1920, max_h: int = 1080) -> list[list[list[int]]] | None:
         """Returns list of polygons: [[[x,y], [x,y], ...], [...], ...]"""
         _enable_dpi_awareness()
+        self._max_w = max_w
+        self._max_h = max_h
         self._frame = frame.copy()
-        self._display, self._scale = _fit_display(frame, 1400, 800)
+        self._display, self._scale = _fit_display(frame, self._max_w, self._max_h)
         self._current_points.clear()
         self._completed.clear()
         self._current_done = False
 
         win = "Vision-Track | ROI Calibration"
-        cv2.namedWindow(win, cv2.WINDOW_AUTOSIZE)
+        cv2.namedWindow(win, cv2.WINDOW_NORMAL)
+        dh, dw = self._display.shape[:2]
+        cv2.resizeWindow(win, dw, dh)
         cv2.setMouseCallback(win, self._mouse_cb)
         self._draw_instructions(self._display)
 

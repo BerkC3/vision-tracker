@@ -1,20 +1,20 @@
 # Vision-Track
 
-Real-time traffic analysis system powered by YOLOv8 and BoT-SORT. Detects vehicles, tracks them across frames, estimates speed, and flags lane violations.
+Real-time traffic analysis system powered by YOLO11 and BoT-SORT. Detects vehicles, tracks them across frames, estimates speed, and flags lane violations.
 
 ![Python](https://img.shields.io/badge/Python-3.10+-blue?logo=python&logoColor=white)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.6+-ee4c2c?logo=pytorch&logoColor=white)
-![YOLOv8](https://img.shields.io/badge/YOLOv8-Ultralytics-00FFFF?logo=yolo&logoColor=white)
+![YOLO11](https://img.shields.io/badge/YOLO11-Ultralytics-00FFFF?logo=yolo&logoColor=white)
 ![OpenCV](https://img.shields.io/badge/OpenCV-4.8+-5C3EE8?logo=opencv&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
 ## Features
 
-- **Vehicle Detection** - YOLOv8 (nano to extra-large) with COCO vehicle classes (car, motorcycle, bus, truck)
+- **Vehicle Detection** - YOLO11 (nano to extra-large) with COCO vehicle classes (car, motorcycle, bus, truck)
 - **Multi-Object Tracking** - BoT-SORT with re-identification for robust tracking through occlusions
 - **Speed Estimation** - Two-line crossing method with perspective-aware polyline paths
-- **Lane Violation Detection** - Multiple ROI polygon zones with cooldown-based alerting
-- **Interactive Calibration** - Draw speed lines and restricted zones directly on the first frame
+- **Lane Violation Detection** - Multiple ROI polygon zones; each vehicle-zone pair is recorded exactly once and logged to CSV
+- **Interactive Calibration** - Draw speed lines and restricted zones on a configurable stable frame (skips initial camera shake)
 - **Dual Interface** - CLI with OpenCV display + Streamlit web dashboard
 - **Flexible Input** - Local video files, webcam, or YouTube URLs (via yt-dlp)
 
@@ -25,9 +25,9 @@ main.py                 CLI entry point
 ui/app.py               Streamlit web UI
 
 core/
-  tracker.py            YOLOv8 + BoT-SORT detection & tracking
+  tracker.py            YOLO11 + BoT-SORT detection & tracking
   speed_estimator.py    Two-line speed measurement
-  violation.py          ROI-based lane violation detection
+  violation.py          ROI-based lane violation detection + CSV logging
   detector.py           Standalone detection module
 
 utils/
@@ -52,7 +52,7 @@ venv\Scripts\activate        # Windows
 pip install -r requirements.txt
 ```
 
-> YOLOv8 model weights are downloaded automatically on first run.
+> YOLO11 model weights are downloaded automatically on first run.
 
 ## Usage
 
@@ -83,7 +83,7 @@ streamlit run ui/app.py
 
 ### Interactive Calibration
 
-On startup (unless `--no-calibrate`), two calibration windows appear:
+On startup (unless `--no-calibrate`), the first stable frame (after skipping initial seconds) is shown for calibration:
 
 **Speed Path Calibration:**
 - Left-click to draw Path 1 (start line) - green
@@ -101,48 +101,66 @@ All parameters are in [`configs/settings.yaml`](configs/settings.yaml):
 
 ```yaml
 model:
-  path: "yolov8x.pt"          # yolov8n/s/m/l/x
+  path: "yolo11x.pt"           # yolo11n/s/m/l/x
   confidence: 0.4
-  imgsz: 1920                 # inference resolution
-  classes: [2, 3, 5, 7]       # car, motorcycle, bus, truck
+  imgsz: 1920                  # inference resolution
 
 speed:
   real_distance_m: 15.0        # actual distance between speed lines (meters)
   calibration_mode: true
+  calibration_skip_seconds: 5  # skip N seconds before grabbing calibration frame
 
 violation:
-  cooldown_seconds: 3.0
+  roi_polygon: []              # set via UI or define here
 
 display:
   show_trails: true
   show_speed: true
   show_roi: true
+  max_w: 1920                  # max display width for calibration and live windows
+  max_h: 1080                  # max display height for calibration and live windows
+
+output:
+  save_violations: true        # saves outputs/violations_<timestamp>.csv
+  output_dir: "outputs"
 ```
 
 ### Model Selection Guide
 
-| Model | Speed (RTX 4080 Super) | Accuracy | Best For |
-|-------|------------------------|----------|----------|
-| `yolov8n.pt` | ~60 fps | Good | Real-time, low-power |
-| `yolov8s.pt` | ~45 fps | Better | Balanced |
-| `yolov8m.pt` | ~30 fps | High | General use |
-| `yolov8x.pt` | ~15 fps | Highest | Traffic cameras, accuracy-first |
+| Model | Speed (RTX 4080 Super @ 1920px) | mAP50-95 | Best For |
+|-------|----------------------------------|----------|----------|
+| `yolo11n.pt` | ~55 fps | 39.5 | Real-time, low-power |
+| `yolo11s.pt` | ~40 fps | 47.0 | Balanced |
+| `yolo11m.pt` | ~25 fps | 51.5 | General use |
+| `yolo11l.pt` | ~18 fps | 53.4 | High accuracy |
+| `yolo11x.pt` | ~12 fps | 54.7 | Traffic cameras, accuracy-first |
 
 ## How It Works
 
-1. **Detection & Tracking** - Each frame is passed through YOLOv8 with BoT-SORT tracking (`persist=True`). Vehicles get unique IDs that persist across frames.
+1. **Detection & Tracking** - Each frame is passed through YOLO11 with BoT-SORT tracking (`persist=True`). Vehicles get unique IDs that persist across frames.
 
 2. **Speed Estimation** - Two polyline paths are placed across the road. When a vehicle's center crosses Path 1, a timer starts. When it crosses Path 2, the timer stops. Speed = `real_distance / time_elapsed`.
 
-3. **Violation Detection** - ROI polygons define restricted zones. `cv2.pointPolygonTest()` checks if a vehicle center is inside any zone. A cooldown prevents duplicate alerts for the same vehicle.
+3. **Violation Detection** - ROI polygons define restricted zones. `cv2.pointPolygonTest()` checks if a vehicle center is inside any zone. Each `(vehicle_id, zone)` pair is recorded **exactly once** — no duplicate alerts — and appended to a timestamped CSV file in `outputs/`.
 
 4. **Rendering** - Bounding boxes, trail polylines, speed labels, violation flashes, and a stats panel are composited onto each frame using OpenCV's drawing and alpha blending functions.
+
+## Violation Log
+
+Each run with `save_violations: true` produces a CSV in `outputs/violations_<timestamp>.csv`:
+
+```
+timestamp,track_id,class_name,roi_zone,center_x,center_y
+2026-02-19 14:30:15,10,car,1,854.3,612.7
+2026-02-19 14:30:22,10,car,2,921.1,589.4
+2026-02-19 14:30:31,15,truck,1,743.8,634.2
+```
 
 ## Tech Stack
 
 | Component | Technology | Purpose |
 |-----------|-----------|---------|
-| Detection | YOLOv8 (Ultralytics) | Real-time object detection |
+| Detection | YOLO11 (Ultralytics) | Real-time object detection |
 | Tracking | BoT-SORT | Multi-object tracking with re-ID |
 | Backend | PyTorch + CUDA | GPU-accelerated inference |
 | Vision | OpenCV | Video I/O, rendering, geometry |

@@ -102,11 +102,15 @@ class OverlayRenderer:
     def draw_roi(self, frame: np.ndarray, polygon: np.ndarray) -> None:
         if not self.show_roi or polygon is None:
             return
+        # Use a copy — cv2.fillPoly clips pts in-place in some OpenCV versions,
+        # which would corrupt the stored polygon coordinates each frame.
+        poly = polygon.copy()
         overlay = frame.copy()
-        cv2.fillPoly(overlay, [polygon], (*ROI_COLOR, 50))
+        cv2.fillPoly(overlay, [poly], ROI_COLOR)
         cv2.addWeighted(overlay, 0.2, frame, 0.8, 0, frame)
-        cv2.polylines(frame, [polygon], True, ROI_COLOR, 2, cv2.LINE_AA)
-        cv2.putText(frame, "RESTRICTED ZONE", tuple(polygon[0]), cv2.FONT_HERSHEY_SIMPLEX, 0.6, ROI_COLOR, 2)
+        cv2.polylines(frame, [poly], True, ROI_COLOR, 2, cv2.LINE_AA)
+        cv2.putText(frame, "RESTRICTED ZONE", (int(polygon[0][0]), int(polygon[0][1])),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, ROI_COLOR, 2)
 
     def draw_stats(
         self,

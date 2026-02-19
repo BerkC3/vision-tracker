@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import csv
 import logging
-import time
+from collections import defaultdict
 from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
 
 import cv2
 import numpy as np
@@ -15,26 +18,51 @@ class ViolationEvent:
     track_id: int
     class_name: str
     center: tuple[float, float]
-    timestamp: float
+    timestamp: datetime
     roi_index: int = 0
     frame_snapshot: np.ndarray | None = None
+
+
+_CSV_HEADER = ["timestamp", "track_id", "class_name", "roi_zone", "center_x", "center_y"]
 
 
 class LaneViolationDetector:
     def __init__(
         self,
         roi_polygons: list[list[list[int]]] | None = None,
-        cooldown_seconds: float = 3.0,
         save_snapshots: bool = True,
+        violations_file: str | None = None,
     ) -> None:
         self._polygons: list[np.ndarray] = []
         if roi_polygons:
             for poly in roi_polygons:
                 self.add_roi(poly)
-        self.cooldown_seconds = cooldown_seconds
         self.save_snapshots = save_snapshots
-        self._last_violation: dict[int, float] = {}
+        # Permanent per-(track_id, roi_index) tracking — each pair fires exactly once.
+        self._violated: dict[int, set[int]] = defaultdict(set)
         self._violations: list[ViolationEvent] = []
+        self._violations_file: str | None = violations_file
+        if violations_file:
+            self._init_csv(violations_file)
+
+    def _init_csv(self, path: str) -> None:
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "w", newline="", encoding="utf-8") as f:
+            csv.writer(f).writerow(_CSV_HEADER)
+        logger.info(f"Violations log: {path}")
+
+    def _append_csv(self, event: ViolationEvent) -> None:
+        if not self._violations_file:
+            return
+        with open(self._violations_file, "a", newline="", encoding="utf-8") as f:
+            csv.writer(f).writerow([
+                event.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+                event.track_id,
+                event.class_name,
+                event.roi_index + 1,
+                f"{event.center[0]:.1f}",
+                f"{event.center[1]:.1f}",
+            ])
 
     def add_roi(self, polygon: list[list[int]]) -> None:
         self._polygons.append(np.array(polygon, dtype=np.int32))
@@ -77,29 +105,28 @@ class LaneViolationDetector:
         if hit_index < 0:
             return None
 
-        now = time.monotonic()
-        last = self._last_violation.get(track_id, 0)
-        if now - last < self.cooldown_seconds:
+        # Each (track_id, roi_index) pair is recorded exactly once.
+        if hit_index in self._violated[track_id]:
             return None
+        self._violated[track_id].add(hit_index)
 
-        self._last_violation[track_id] = now
-
-        snapshot = None
-        if self.save_snapshots and frame is not None:
-            snapshot = frame.copy()
+        snapshot = frame.copy() if self.save_snapshots and frame is not None else None
 
         event = ViolationEvent(
             track_id=track_id,
             class_name=class_name,
             center=center,
-            timestamp=now,
+            timestamp=datetime.now(),
             roi_index=hit_index,
             frame_snapshot=snapshot,
         )
         self._violations.append(event)
-        logger.warning(f"VIOLATION: Vehicle #{track_id} ({class_name}) in restricted zone #{hit_index + 1}")
+        self._append_csv(event)
+        logger.warning(
+            f"VIOLATION: Vehicle #{track_id} ({class_name}) in restricted zone #{hit_index + 1}"
+        )
         return event
 
     def reset(self) -> None:
-        self._last_violation.clear()
+        self._violated.clear()
         self._violations.clear()
