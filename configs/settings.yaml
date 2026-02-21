@@ -1,5 +1,5 @@
 model:
-  path: "yolo11x.pt"
+  path: "yolov8x.pt"
   confidence: 0.4
   iou_threshold: 0.5
   device: "auto"  # auto | cpu | cuda | cuda:0
