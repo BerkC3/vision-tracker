@@ -148,8 +148,8 @@ def run(source: str | int, config: dict, output_path: str | None = None, show: b
 
             renderer.draw_speed_paths(frame, path1, path2)
             if violation_det.has_roi:
-                for poly in violation_det.polygons:
-                    renderer.draw_roi(frame, poly)
+                for i, poly in enumerate(violation_det.polygons):
+                    renderer.draw_roi(frame, poly, label=f"Restricted Zone {i + 1}")
 
             for v in vehicles:
                 speed = speed_est.estimate(v.track_id, v.center, timestamp=video_timestamp)
