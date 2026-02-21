@@ -40,7 +40,7 @@ def get_tracker(model_path: str, confidence: float, device: str, classes: list[i
 
 def main() -> None:
     st.title("🚗 Vision-Track AI")
-    st.caption("Real-time Traffic Analysis with YOLOv8 + BoT-SORT")
+    st.caption("Real-time Traffic Analysis with Ultralytics YOLO + BoT-SORT")
 
     config = load_config()
 
@@ -62,7 +62,14 @@ def main() -> None:
         st.divider()
         st.subheader("Detection")
         confidence = st.slider("Confidence", 0.1, 1.0, config["model"]["confidence"], 0.05)
-        model_size = st.selectbox("Model", ["yolov8n.pt", "yolov8s.pt", "yolov8m.pt", "yolov8l.pt", "yolov8x.pt"])
+        model_size = st.selectbox(
+            "Model",
+            [
+                "yolo11n.pt", "yolo11s.pt", "yolo11m.pt", "yolo11l.pt", "yolo11x.pt",
+                "yolov8n.pt", "yolov8s.pt", "yolov8m.pt", "yolov8l.pt", "yolov8x.pt",
+            ],
+            help="YOLO11 (recommended) or YOLOv8. Larger models are more accurate but slower.",
+        )
         imgsz = st.selectbox("Inference Resolution", [640, 1280, 1920], index=2)
 
         st.divider()
@@ -176,8 +183,8 @@ def main() -> None:
 
         renderer.draw_speed_paths(frame, path1, path2)
         if violation_det.has_roi:
-            for poly in violation_det.polygons:
-                renderer.draw_roi(frame, poly)
+            for i, poly in enumerate(violation_det.polygons):
+                renderer.draw_roi(frame, poly, label=f"Restricted Zone {i + 1}")
 
         for v in vehicles:
             speed = speed_est.estimate(v.track_id, v.center, timestamp=video_timestamp)

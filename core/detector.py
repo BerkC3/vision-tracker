@@ -24,7 +24,7 @@ class Detection:
 class VehicleDetector:
     def __init__(
         self,
-        model_path: str = "yolov8n.pt",
+        model_path: str = "yolo11n.pt",
         confidence: float = 0.4,
         iou_threshold: float = 0.5,
         device: str = "auto",

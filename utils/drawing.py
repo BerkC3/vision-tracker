@@ -99,7 +99,7 @@ class OverlayRenderer:
             cv2.putText(frame, "PATH 2", (path2[0][0] + 8, path2[0][1] - 10),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 140, 255), 2)
 
-    def draw_roi(self, frame: np.ndarray, polygon: np.ndarray, label: str = "RESTRICTED ZONE") -> None:
+    def draw_roi(self, frame: np.ndarray, polygon: np.ndarray, label: str = "Restricted Zone") -> None:
         if not self.show_roi or polygon is None:
             return
         # Use a copy — cv2.fillPoly clips pts in-place in some OpenCV versions,

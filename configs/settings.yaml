@@ -1,11 +1,14 @@
 model:
-  path: "yolov8x.pt"
+  path: "yolo11x.pt"   # any Ultralytics YOLO model — yolo11n/s/m/l/x or yolov8n/s/m/l/x
   confidence: 0.4
   iou_threshold: 0.5
   device: "auto"  # auto | cpu | cuda | cuda:0
   imgsz: 1920     # inference resolution (640, 1280, 1920) - RTX 4080 Super handles 1920
   classes: [2, 3, 5, 7]  # COCO: car, motorcycle, bus, truck
 
+# Note: tracker parameters below are for reference only — the code uses Ultralytics'
+# built-in botsort.yaml defaults. To customise, copy botsort.yaml from the Ultralytics
+# package and pass its path to VehicleTracker(tracker_config=...).
 tracker:
   type: "botsort"  # botsort | bytetrack
   track_high_thresh: 0.5
@@ -24,7 +27,7 @@ speed:
 
 violation:
   roi_polygon: []  # set via UI or here as [[x1,y1],[x2,y2],...]
-  cooldown_seconds: 3.0
+  # Each (vehicle_id, zone) pair is recorded exactly once — no cooldown, no duplicates.
 
 display:
   show_trails: true
@@ -38,7 +41,5 @@ display:
   max_h: 1080           # max display height for calibration and live windows
 
 output:
-  save_video: true
-  save_violations: true
+  save_violations: true   # saves outputs/violations_<timestamp>.csv
   output_dir: "outputs"
-  codec: "mp4v"
