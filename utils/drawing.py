@@ -5,16 +5,16 @@ import numpy as np
 
 # Color palette for different vehicle classes
 CLASS_COLORS = {
-    "car": (0, 255, 0),        # green
-    "truck": (255, 165, 0),    # orange
-    "bus": (255, 0, 255),      # magenta
-    "motorcycle": (0, 255, 255), # yellow
+    "car": (0, 255, 0),  # green
+    "truck": (255, 165, 0),  # orange
+    "bus": (255, 0, 255),  # magenta
+    "motorcycle": (0, 255, 255),  # yellow
     "unknown": (200, 200, 200),
 }
 
 VIOLATION_COLOR = (0, 0, 255)  # red
-LINE_COLOR = (0, 200, 255)    # cyan-yellow
-ROI_COLOR = (255, 100, 0)     # blue-ish
+LINE_COLOR = (0, 200, 255)  # cyan-yellow
+ROI_COLOR = (255, 100, 0)  # blue-ish
 
 
 class OverlayRenderer:
@@ -47,7 +47,11 @@ class OverlayRenderer:
         is_violating: bool = False,
     ) -> None:
         x1, y1, x2, y2 = map(int, bbox)
-        color = VIOLATION_COLOR if is_violating else CLASS_COLORS.get(class_name, CLASS_COLORS["unknown"])
+        color = (
+            VIOLATION_COLOR
+            if is_violating
+            else CLASS_COLORS.get(class_name, CLASS_COLORS["unknown"])
+        )
 
         # Bounding box
         cv2.rectangle(frame, (x1, y1), (x2, y2), color, self.box_thickness)
@@ -57,9 +61,19 @@ class OverlayRenderer:
         if self.show_speed and speed is not None:
             label += f" {speed:.0f}km/h"
 
-        (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, self.font_scale, 1)
+        (tw, th), _ = cv2.getTextSize(
+            label, cv2.FONT_HERSHEY_SIMPLEX, self.font_scale, 1
+        )
         cv2.rectangle(frame, (x1, y1 - th - 10), (x1 + tw + 6, y1), color, -1)
-        cv2.putText(frame, label, (x1 + 3, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, self.font_scale, (0, 0, 0), 2)
+        cv2.putText(
+            frame,
+            label,
+            (x1 + 3, y1 - 5),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            self.font_scale,
+            (0, 0, 0),
+            2,
+        )
 
         # Trail
         if self.show_trails and trail and len(trail) > 1:
@@ -88,18 +102,34 @@ class OverlayRenderer:
             cv2.polylines(frame, [pts], False, (0, 255, 0), 3, cv2.LINE_AA)
             for p in path1:
                 cv2.circle(frame, p, 4, (0, 255, 0), -1)
-            cv2.putText(frame, "PATH 1", (path1[0][0] + 8, path1[0][1] - 10),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+            cv2.putText(
+                frame,
+                "PATH 1",
+                (path1[0][0] + 8, path1[0][1] - 10),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.5,
+                (0, 255, 0),
+                2,
+            )
 
         if path2:
             pts = np.array(path2, dtype=np.int32)
             cv2.polylines(frame, [pts], False, (0, 140, 255), 3, cv2.LINE_AA)
             for p in path2:
                 cv2.circle(frame, p, 4, (0, 140, 255), -1)
-            cv2.putText(frame, "PATH 2", (path2[0][0] + 8, path2[0][1] - 10),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 140, 255), 2)
+            cv2.putText(
+                frame,
+                "PATH 2",
+                (path2[0][0] + 8, path2[0][1] - 10),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.5,
+                (0, 140, 255),
+                2,
+            )
 
-    def draw_roi(self, frame: np.ndarray, polygon: np.ndarray, label: str = "Restricted Zone") -> None:
+    def draw_roi(
+        self, frame: np.ndarray, polygon: np.ndarray, label: str = "Restricted Zone"
+    ) -> None:
         if not self.show_roi or polygon is None:
             return
         # Use a copy — cv2.fillPoly clips pts in-place in some OpenCV versions,
@@ -109,8 +139,15 @@ class OverlayRenderer:
         cv2.fillPoly(overlay, [poly], ROI_COLOR)
         cv2.addWeighted(overlay, 0.2, frame, 0.8, 0, frame)
         cv2.polylines(frame, [poly], True, ROI_COLOR, 2, cv2.LINE_AA)
-        cv2.putText(frame, label, (int(polygon[0][0]), int(polygon[0][1])),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, ROI_COLOR, 2)
+        cv2.putText(
+            frame,
+            label,
+            (int(polygon[0][0]), int(polygon[0][1])),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.6,
+            ROI_COLOR,
+            2,
+        )
 
     def draw_stats(
         self,
@@ -126,7 +163,9 @@ class OverlayRenderer:
 
         overlay = frame.copy()
         cv2.rectangle(overlay, (x, y), (x + panel_w, y + panel_h), (0, 0, 0), -1)
-        cv2.addWeighted(overlay, self.stats_opacity, frame, 1 - self.stats_opacity, 0, frame)
+        cv2.addWeighted(
+            overlay, self.stats_opacity, frame, 1 - self.stats_opacity, 0, frame
+        )
 
         lines = [
             f"Vehicles: {total_vehicles}",
@@ -135,5 +174,17 @@ class OverlayRenderer:
             f"FPS: {fps:.1f}",
         ]
         for i, text in enumerate(lines):
-            color = VIOLATION_COLOR if "Violations" in text and violations > 0 else (255, 255, 255)
-            cv2.putText(frame, text, (x + 10, y + 25 + i * 28), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+            color = (
+                VIOLATION_COLOR
+                if "Violations" in text and violations > 0
+                else (255, 255, 255)
+            )
+            cv2.putText(
+                frame,
+                text,
+                (x + 10, y + 25 + i * 28),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.6,
+                color,
+                2,
+            )

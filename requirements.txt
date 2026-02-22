@@ -8,3 +8,7 @@ pyyaml>=6.0
 streamlit>=1.30.0
 yt-dlp>=2024.1.0
 lapx>=0.5.0
+
+# Database — SQLite (built-in) or PostgreSQL via psycopg2
+sqlalchemy>=2.0.0
+psycopg2-binary>=2.9.0    # only required when DATABASE_URL points to PostgreSQL

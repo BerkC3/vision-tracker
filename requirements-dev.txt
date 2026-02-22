@@ -1,0 +1,10 @@
+# Development and CI dependencies — not installed in the production Docker image.
+# Install with: pip install -r requirements-dev.txt
+
+# Testing
+pytest>=7.0
+pytest-cov>=4.0
+
+# Linting / formatting (mirrors the CI checks in .github/workflows/ci.yml)
+flake8>=6.0
+black>=23.0

@@ -1,0 +1,113 @@
+# =============================================================================
+# Vision-Track — Continuous Integration
+# =============================================================================
+# Runs on every push to 'main' and on all pull requests targeting 'main'.
+#
+# Jobs
+# ----
+#   lint  — Checks code style with black and PEP-8 compliance with flake8.
+#   test  — Runs the unit-test suite with pytest on CPU-only PyTorch.
+#           Coverage is reported and uploaded as a build artifact.
+# =============================================================================
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+
+  # ---------------------------------------------------------------------------
+  # Job: lint
+  # Fast style checks — fails immediately if formatting or style issues exist.
+  # ---------------------------------------------------------------------------
+  lint:
+    name: Lint (black + flake8)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install linters
+        run: pip install black>=23.0 "flake8>=6.0"
+
+      # black --check exits with a non-zero code if any file would be
+      # reformatted, making the CI step fail without modifying any files.
+      - name: black — check formatting
+        run: black --check --diff .
+
+      # flake8 enforces PEP-8 with a slightly relaxed line length (100 chars)
+      # to align with the black default.  E203/W503 are disabled because they
+      # conflict with black's style.
+      - name: flake8 — check style
+        run: |
+          flake8 . \
+            --max-line-length=100 \
+            --extend-ignore=E203,W503 \
+            --exclude=.git,__pycache__,.venv,outputs,tracker
+
+
+  # ---------------------------------------------------------------------------
+  # Job: test
+  # Runs the unit-test suite.  GPU is not available in GitHub-hosted runners,
+  # so PyTorch is installed from the CPU wheel index.
+  # ---------------------------------------------------------------------------
+  test:
+    name: Unit Tests (pytest)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install PyTorch (CPU-only)
+        # Install torch and torchvision from the CPU wheel index.
+        # This avoids pulling a multi-GB CUDA wheel in the CI environment.
+        run: |
+          pip install --upgrade pip
+          pip install \
+            "torch>=2.6.0" \
+            "torchvision>=0.21.0" \
+            --index-url https://download.pytorch.org/whl/cpu
+
+      - name: Install project dependencies
+        # Filter out torch/torchvision (already installed) and the CUDA
+        # extra-index-url line so pip does not try to resolve CUDA packages.
+        run: |
+          grep -vE '^(torch|torchvision|--extra-index-url)' requirements.txt \
+            | pip install -r /dev/stdin
+
+      - name: Install test dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Run pytest with coverage
+        run: |
+          pytest tests/ \
+            --verbose \
+            --cov=core \
+            --cov-report=term-missing \
+            --cov-report=xml:coverage.xml
+
+      # Upload the coverage XML so it can be used by downstream tools
+      # (e.g. Codecov, SonarQube) or inspected as a build artifact.
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from pathlib import Path
 
 import numpy as np
 import torch
@@ -15,7 +14,7 @@ COCO_VEHICLE_NAMES = {2: "car", 3: "motorcycle", 5: "bus", 7: "truck"}
 
 @dataclass
 class Detection:
-    bbox: np.ndarray       # [x1, y1, x2, y2]
+    bbox: np.ndarray  # [x1, y1, x2, y2]
     class_id: int
     class_name: str
     confidence: float
@@ -62,12 +61,14 @@ class VehicleDetector:
                 continue
             for box in r.boxes:
                 cls_id = int(box.cls[0])
-                detections.append(Detection(
-                    bbox=box.xyxy[0].cpu().numpy(),
-                    class_id=cls_id,
-                    class_name=COCO_VEHICLE_NAMES.get(cls_id, "unknown"),
-                    confidence=float(box.conf[0]),
-                ))
+                detections.append(
+                    Detection(
+                        bbox=box.xyxy[0].cpu().numpy(),
+                        class_id=cls_id,
+                        class_name=COCO_VEHICLE_NAMES.get(cls_id, "unknown"),
+                        confidence=float(box.conf[0]),
+                    )
+                )
         return detections
 
     def detect_raw(self, frame: np.ndarray):

@@ -1,11 +1,13 @@
 # Vision-Track
 
-Real-time traffic analysis system powered by Ultralytics YOLO and BoT-SORT. Detects vehicles, tracks them across frames, estimates speed, and flags lane violations.
+Real-time traffic analysis system powered by Ultralytics YOLO and BoT-SORT. Detects vehicles, tracks them across frames, estimates speed, and flags lane violations with persistent database logging.
 
 ![Python](https://img.shields.io/badge/Python-3.10+-blue?logo=python&logoColor=white)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.6+-ee4c2c?logo=pytorch&logoColor=white)
 ![Ultralytics](https://img.shields.io/badge/YOLO-Ultralytics-00FFFF?logo=yolo&logoColor=white)
 ![OpenCV](https://img.shields.io/badge/OpenCV-4.8+-5C3EE8?logo=opencv&logoColor=white)
+![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-2.0+-red?logo=python&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
 ## Features
@@ -13,10 +15,12 @@ Real-time traffic analysis system powered by Ultralytics YOLO and BoT-SORT. Dete
 - **Vehicle Detection** - Ultralytics YOLO (YOLOv8 or YOLO11, nano to extra-large) with COCO vehicle classes (car, motorcycle, bus, truck)
 - **Multi-Object Tracking** - BoT-SORT with re-identification for robust tracking through occlusions
 - **Speed Estimation** - Two-line crossing method with perspective-aware polyline paths
-- **Lane Violation Detection** - Multiple named ROI polygon zones (Restricted Zone 1, 2, …); each vehicle-zone pair is recorded exactly once and logged to CSV
+- **Lane Violation Detection** - Multiple named ROI polygon zones; each (vehicle, zone) pair is recorded exactly once and persisted to SQLite or PostgreSQL
 - **Interactive Calibration** - Draw speed lines and restricted zones on a configurable stable frame (skips initial camera shake)
 - **Dual Interface** - CLI with OpenCV display + Streamlit web dashboard
 - **Flexible Input** - Local video files, webcam, or YouTube URLs (via yt-dlp)
+- **Database Persistence** - SQLAlchemy ORM; SQLite by default, switchable to PostgreSQL via environment variable
+- **Docker Support** - Multi-stage Dockerfile + docker-compose for zero-setup deployment
 
 ## Architecture
 
@@ -27,8 +31,9 @@ ui/app.py               Streamlit web UI
 core/
   tracker.py            YOLO + BoT-SORT detection & tracking
   speed_estimator.py    Two-line speed measurement
-  violation.py          ROI-based lane violation detection + CSV logging
+  violation.py          ROI-based lane violation detection + database logging
   detector.py           Standalone detection module
+  database.py           SQLAlchemy ORM (SQLite / PostgreSQL)
 
 utils/
   video.py              Video I/O (file, webcam, YouTube)
@@ -37,6 +42,14 @@ utils/
 
 configs/
   settings.yaml         All tunable parameters
+
+tests/
+  test_database.py      Unit tests — database layer (66 tests total)
+  test_speed.py         Unit tests — speed estimator
+  test_violation.py     Unit tests — violation detector
+
+.github/workflows/
+  ci.yml                GitHub Actions CI (lint + test)
 ```
 
 ## Installation
@@ -53,6 +66,28 @@ pip install -r requirements.txt
 ```
 
 > YOLO model weights are downloaded automatically on first run.
+
+## Docker
+
+The easiest way to run Vision-Track — no Python setup required:
+
+```bash
+# Build and start (SQLite, CPU)
+docker compose up --build
+
+# Start in background
+docker compose up -d
+
+# View logs
+docker compose logs -f app
+
+# Stop
+docker compose down
+```
+
+The Streamlit dashboard is available at `http://localhost:8501`.
+
+**GPU support:** Uncomment the `deploy` section in `docker-compose.yml` and set `TORCH_INDEX_URL` to the CUDA 12.4 wheel index. Requires the NVIDIA Container Toolkit.
 
 ## Usage
 
@@ -102,7 +137,7 @@ All parameters are in [`configs/settings.yaml`](configs/settings.yaml):
 
 ```yaml
 model:
-  path: "yolo11x.pt"           # see Model Selection Guide below
+  path: "yolov8x.pt"           # see Model Selection Guide below
   confidence: 0.4
   imgsz: 1920                  # inference resolution
 
@@ -122,7 +157,7 @@ display:
   max_h: 1080                  # max display height for calibration and live windows
 
 output:
-  save_violations: true        # saves outputs/violations_<timestamp>.csv
+  save_violations: true        # enables database logging
   output_dir: "outputs"
 ```
 
@@ -158,20 +193,50 @@ The system supports any Ultralytics YOLO model — both the **YOLOv8** and **YOL
 
 2. **Speed Estimation** - Two polyline paths are placed across the road. When a vehicle's center crosses Path 1, a timer starts. When it crosses Path 2, the timer stops. Speed = `real_distance / time_elapsed`.
 
-3. **Violation Detection** - ROI polygons define restricted zones labeled **Restricted Zone 1**, **Restricted Zone 2**, etc. `cv2.pointPolygonTest()` checks if a vehicle center is inside any zone. Each `(vehicle_id, zone)` pair is recorded **exactly once** — no duplicate alerts — and appended to a timestamped CSV file in `outputs/`.
+3. **Violation Detection** - ROI polygons define restricted zones labeled **Restricted Zone 1**, **Restricted Zone 2**, etc. `cv2.pointPolygonTest()` checks if a vehicle center is inside any zone. Each `(vehicle_id, zone)` pair is recorded **exactly once** — no duplicate alerts — and persisted to the database.
 
 4. **Rendering** - Bounding boxes, trail polylines, speed labels, violation flashes, and a stats panel are composited onto each frame using OpenCV's drawing and alpha blending functions.
 
-## Violation Log
+## Database & Violation Log
 
-Each run with `save_violations: true` produces a CSV in `outputs/violations_<timestamp>.csv`:
+Violations are persisted automatically via SQLAlchemy to `outputs/violations.db` (SQLite by default).
 
+**Table: `violations`**
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | INTEGER | Auto-increment primary key |
+| `timestamp` | DATETIME | UTC datetime of violation |
+| `track_id` | INTEGER | BoT-SORT track identifier |
+| `class_name` | VARCHAR | Vehicle type (car, truck, bus, motorcycle) |
+| `roi_zone` | INTEGER | 1-based restricted zone index |
+| `center_x` | FLOAT | Vehicle center X coordinate (pixels) |
+| `center_y` | FLOAT | Vehicle center Y coordinate (pixels) |
+
+**Switching to PostgreSQL:**
+
+```bash
+# Set the environment variable before running
+export DATABASE_URL=postgresql://user:password@localhost:5432/visiontrack
+python main.py --source road.mp4
 ```
-timestamp,track_id,class_name,roi_zone,center_x,center_y
-2026-02-19 14:30:15,10,car,1,854.3,612.7
-2026-02-19 14:30:22,10,car,2,921.1,589.4
-2026-02-19 14:30:31,15,truck,1,743.8,634.2
+
+Or uncomment the `db` service in `docker-compose.yml` for a fully containerised setup.
+
+## Testing
+
+```bash
+# Install dev dependencies
+pip install -r requirements-dev.txt
+
+# Run all tests with coverage
+pytest tests/ --cov=core --cov-report=term-missing
+
+# Run a specific test file
+pytest tests/test_database.py -v
 ```
+
+The test suite has **66 tests** covering the database layer, speed estimator, and violation detector. All tests run on CPU without a GPU.
 
 ## Tech Stack
 
@@ -181,9 +246,12 @@ timestamp,track_id,class_name,roi_zone,center_x,center_y
 | Tracking | BoT-SORT | Multi-object tracking with re-ID |
 | Backend | PyTorch + CUDA | GPU-accelerated inference |
 | Vision | OpenCV | Video I/O, rendering, geometry |
+| Database | SQLAlchemy 2.0 + SQLite / PostgreSQL | Violation persistence |
 | Web UI | Streamlit | Browser-based dashboard |
 | Streaming | yt-dlp | YouTube URL resolution |
 | Config | PyYAML | Human-readable configuration |
+| Container | Docker + docker-compose | Zero-setup deployment |
+| CI | GitHub Actions | Lint + test on every push |
 
 ## License
 

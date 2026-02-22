@@ -3,7 +3,6 @@ from __future__ import annotations
 import argparse
 import logging
 import time
-from datetime import datetime
 
 import cv2
 import yaml
@@ -11,6 +10,7 @@ import yaml
 from core.tracker import VehicleTracker
 from core.speed_estimator import SpeedEstimator
 from core.violation import LaneViolationDetector
+from core.database import init_db
 from utils.drawing import OverlayRenderer
 from utils.calibration import PathCalibrator, ROICalibrator
 from utils.video import VideoSource, VideoWriter
@@ -35,7 +35,13 @@ def _default_paths(h: int, w: int, config: dict) -> tuple[list, list]:
     return [(0, y1), (w, y1)], [(0, y2), (w, y2)]
 
 
-def run(source: str | int, config: dict, output_path: str | None = None, show: bool = True, test_mode: bool = False) -> None:
+def run(
+    source: str | int,
+    config: dict,
+    output_path: str | None = None,
+    show: bool = True,
+    test_mode: bool = False,
+) -> None:
     model_cfg = config["model"]
     speed_cfg = config["speed"]
     viol_cfg = config["violation"]
@@ -75,7 +81,9 @@ def run(source: str | int, config: dict, output_path: str | None = None, show: b
     if test_mode:
         path1 = [(0, int(h * 0.4)), (w, int(h * 0.4))]
         path2 = [(0, int(h * 0.65)), (w, int(h * 0.65))]
-        logger.info(f"TEST MODE: Fixed speed paths at y={int(h * 0.4)} and y={int(h * 0.65)}")
+        logger.info(
+            f"TEST MODE: Fixed speed paths at y={int(h * 0.4)} and y={int(h * 0.65)}"
+        )
     else:
         path1, path2 = _default_paths(h, w, config)
         if speed_cfg.get("calibration_mode", False) and show:
@@ -99,21 +107,28 @@ def run(source: str | int, config: dict, output_path: str | None = None, show: b
     cfg_roi = viol_cfg.get("roi_polygon") or []
     if cfg_roi:
         # Config has a single polygon - wrap in list
-        roi_polygons = [cfg_roi] if cfg_roi and isinstance(cfg_roi[0], list) and not isinstance(cfg_roi[0][0], list) else cfg_roi
+        roi_polygons = (
+            [cfg_roi]
+            if cfg_roi
+            and isinstance(cfg_roi[0], list)
+            and not isinstance(cfg_roi[0][0], list)
+            else cfg_roi
+        )
     if not roi_polygons and show and not test_mode:
         roi_cal = ROICalibrator()
         roi_polygons = roi_cal.calibrate(calib_frame, max_w=max_w, max_h=max_h)
 
     out_cfg = config.get("output", {})
-    violations_file = None
-    if out_cfg.get("save_violations", True):
-        out_dir = out_cfg.get("output_dir", "outputs")
-        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        violations_file = f"{out_dir}/violations_{ts}.csv"
+    # Initialise the database and create the violations table when persistence
+    # is enabled.  LaneViolationDetector also calls init_db(), but doing it
+    # here makes the startup sequence explicit in the logs.
+    use_db = out_cfg.get("save_violations", True)
+    if use_db:
+        init_db()
 
     violation_det = LaneViolationDetector(
         roi_polygons=roi_polygons,
-        violations_file=violations_file,
+        use_database=use_db,
     )
 
     renderer = OverlayRenderer(
@@ -152,12 +167,22 @@ def run(source: str | int, config: dict, output_path: str | None = None, show: b
                     renderer.draw_roi(frame, poly, label=f"Restricted Zone {i + 1}")
 
             for v in vehicles:
-                speed = speed_est.estimate(v.track_id, v.center, timestamp=video_timestamp)
-                violation = violation_det.check(v.track_id, v.center, v.class_name, frame)
+                speed = speed_est.estimate(
+                    v.track_id, v.center, timestamp=video_timestamp
+                )
+                violation = violation_det.check(
+                    v.track_id, v.center, v.class_name, frame
+                )
 
                 renderer.draw_vehicle(
-                    frame, v.bbox, v.track_id, v.class_name, v.confidence,
-                    speed=speed, trail=v.trail, is_violating=violation is not None,
+                    frame,
+                    v.bbox,
+                    v.track_id,
+                    v.class_name,
+                    v.confidence,
+                    speed=speed,
+                    trail=v.trail,
+                    is_violating=violation is not None,
                 )
 
             frame_count += 1
@@ -194,13 +219,30 @@ def run(source: str | int, config: dict, output_path: str | None = None, show: b
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Vision-Track: Traffic Analysis System")
-    parser.add_argument("--source", type=str, default="0", help="Video path, webcam index, or YouTube URL")
-    parser.add_argument("--config", type=str, default="configs/settings.yaml", help="Config file path")
+    parser = argparse.ArgumentParser(
+        description="Vision-Track: Traffic Analysis System"
+    )
+    parser.add_argument(
+        "--source",
+        type=str,
+        default="0",
+        help="Video path, webcam index, or YouTube URL",
+    )
+    parser.add_argument(
+        "--config", type=str, default="configs/settings.yaml", help="Config file path"
+    )
     parser.add_argument("--output", type=str, default=None, help="Output video path")
-    parser.add_argument("--no-display", action="store_true", help="Disable window display")
-    parser.add_argument("--no-calibrate", action="store_true", help="Skip interactive calibration")
-    parser.add_argument("--test", action="store_true", help="Use fixed speed paths for consistent testing")
+    parser.add_argument(
+        "--no-display", action="store_true", help="Disable window display"
+    )
+    parser.add_argument(
+        "--no-calibrate", action="store_true", help="Skip interactive calibration"
+    )
+    parser.add_argument(
+        "--test",
+        action="store_true",
+        help="Use fixed speed paths for consistent testing",
+    )
     args = parser.parse_args()
 
     config = load_config(args.config)
@@ -212,7 +254,13 @@ def main() -> None:
     if source.isdigit():
         source = int(source)
 
-    run(source=source, config=config, output_path=args.output, show=not args.no_display, test_mode=args.test)
+    run(
+        source=source,
+        config=config,
+        output_path=args.output,
+        show=not args.no_display,
+        test_mode=args.test,
+    )
 
 
 if __name__ == "__main__":

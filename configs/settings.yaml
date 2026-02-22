@@ -1,5 +1,5 @@
 model:
-  path: "yolo11x.pt"   # any Ultralytics YOLO model — yolo11n/s/m/l/x or yolov8n/s/m/l/x
+  path: "yolov8x.pt"   # any Ultralytics YOLO model — yolo11n/s/m/l/x or yolov8n/s/m/l/x
   confidence: 0.4
   iou_threshold: 0.5
   device: "auto"  # auto | cpu | cuda | cuda:0

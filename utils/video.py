@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import subprocess
-import tempfile
 from pathlib import Path
 from typing import Generator
 
@@ -21,7 +20,9 @@ class VideoSource:
     def open(self) -> None:
         source = self._source
 
-        if isinstance(source, str) and ("youtube.com" in source or "youtu.be" in source):
+        if isinstance(source, str) and (
+            "youtube.com" in source or "youtu.be" in source
+        ):
             source = self._resolve_youtube(source)
 
         self._resolved_path = source
@@ -40,7 +41,9 @@ class VideoSource:
         try:
             result = subprocess.run(
                 ["yt-dlp", "-f", "best[height<=1080]", "-g", url],
-                capture_output=True, text=True, timeout=30,
+                capture_output=True,
+                text=True,
+                timeout=30,
             )
             if result.returncode == 0:
                 stream_url = result.stdout.strip()

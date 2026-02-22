@@ -1,0 +1,115 @@
+# =============================================================================
+# Vision-Track — docker-compose.yml
+# =============================================================================
+#
+# Default configuration uses SQLite (zero-config, no extra service needed).
+# To switch to PostgreSQL:
+#   1. Uncomment the 'db' service at the bottom of this file.
+#   2. Replace the DATABASE_URL in the 'app' environment with the PostgreSQL
+#      connection string.
+#   3. Add 'db' to the 'depends_on' list of the 'app' service.
+#
+# Usage:
+#   docker compose up --build          # build and start
+#   docker compose up -d               # start in background (detached)
+#   docker compose logs -f app         # tail logs
+#   docker compose down                # stop and remove containers
+# =============================================================================
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # app — Vision-Track (Streamlit UI + YOLO tracking pipeline)
+  # ---------------------------------------------------------------------------
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Switch to https://download.pytorch.org/whl/cu124 and uncomment
+        # the 'deploy' section below to enable GPU support.
+        TORCH_INDEX_URL: https://download.pytorch.org/whl/cpu
+    image: vision-track:latest
+    container_name: vision-track-app
+    restart: unless-stopped
+
+    ports:
+      - "8501:8501"   # Streamlit UI — open http://localhost:8501
+
+    volumes:
+      # Persist the SQLite database file and any saved snapshots between
+      # container restarts.  The host path is created automatically by Docker.
+      - ./outputs:/app/outputs
+      # Mount configs as read-only so the running container always uses the
+      # settings from the host filesystem without requiring a rebuild.
+      - ./configs:/app/configs:ro
+      # Uncomment to pre-load YOLO model weights from a local directory and
+      # avoid re-downloading them on every container start.
+      # - ./models:/app/models:ro
+
+    environment:
+      # SQLite — default, requires no extra service.
+      # The path is relative to the WORKDIR (/app) inside the container.
+      - DATABASE_URL=sqlite:///outputs/violations.db
+
+      # PostgreSQL — uncomment and configure if using the 'db' service below.
+      # - DATABASE_URL=postgresql://vision:secret@db:5432/visiontrack
+
+      # Set to 1 to print every SQL statement to the container log.
+      - DB_ECHO=0
+
+    # Uncomment to pass GPU(s) to the container.
+    # Requires: NVIDIA Container Toolkit installed on the Docker host.
+    # See: https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1                 # or 'all'
+    #           capabilities: [gpu]
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+    # Uncomment 'depends_on' when using the PostgreSQL service.
+    # depends_on:
+    #   db:
+    #     condition: service_healthy
+
+
+  # ---------------------------------------------------------------------------
+  # db — PostgreSQL (optional — comment out if using SQLite)
+  # ---------------------------------------------------------------------------
+  # To enable: uncomment this entire block, update DATABASE_URL in 'app', and
+  # add 'db' to the 'depends_on' list above.
+  #
+  # db:
+  #   image: postgres:16-alpine
+  #   container_name: vision-track-db
+  #   restart: unless-stopped
+  #   environment:
+  #     POSTGRES_DB: visiontrack
+  #     POSTGRES_USER: vision
+  #     # Change this in production!  Use Docker secrets or an .env file.
+  #     POSTGRES_PASSWORD: secret
+  #   volumes:
+  #     # Named volume keeps data across container recreations.
+  #     - postgres_data:/var/lib/postgresql/data
+  #   ports:
+  #     # Expose only for local inspection.  Remove in production.
+  #     - "5432:5432"
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U vision -d visiontrack"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+
+
+# Named volume for PostgreSQL data persistence (only used when 'db' is active).
+volumes:
+  postgres_data:

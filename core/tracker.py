@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class TrackedVehicle:
     track_id: int
-    bbox: np.ndarray           # [x1, y1, x2, y2]
+    bbox: np.ndarray  # [x1, y1, x2, y2]
     class_id: int
     class_name: str
     confidence: float
@@ -47,7 +47,9 @@ class VehicleTracker:
         self.trail_length = trail_length
         self._trails: dict[int, list[tuple[float, float]]] = defaultdict(list)
         self._seen_ids: set[int] = set()
-        logger.info(f"Tracker ready on {self.device} | imgsz={imgsz} | tracker={tracker_config}")
+        logger.info(
+            f"Tracker ready on {self.device} | imgsz={imgsz} | tracker={tracker_config}"
+        )
 
     @staticmethod
     def _resolve_device(device: str) -> str:
@@ -57,8 +59,13 @@ class VehicleTracker:
                 vram = torch.cuda.get_device_properties(0).total_memory / 1024**3
                 logger.info(f"GPU detected: {gpu_name} ({vram:.1f} GB VRAM)")
                 return "cuda:0"
-            logger.warning("CUDA not available! Running on CPU - expect slow performance.")
-            logger.warning("Install CUDA torch: pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124")
+            logger.warning(
+                "CUDA not available! Running on CPU - expect slow performance."
+            )
+            logger.warning(
+                "Install CUDA torch: pip install torch torchvision "
+                "--index-url https://download.pytorch.org/whl/cu124"
+            )
             return "cpu"
         return device
 
@@ -88,19 +95,21 @@ class VehicleTracker:
 
                 self._trails[tid].append((cx, cy))
                 if len(self._trails[tid]) > self.trail_length:
-                    self._trails[tid] = self._trails[tid][-self.trail_length:]
+                    self._trails[tid] = self._trails[tid][-self.trail_length :]
 
                 self._seen_ids.add(tid)
 
-                vehicles.append(TrackedVehicle(
-                    track_id=tid,
-                    bbox=xyxy,
-                    class_id=cls_id,
-                    class_name=COCO_VEHICLE_NAMES.get(cls_id, "unknown"),
-                    confidence=float(box.conf[0]),
-                    center=(cx, cy),
-                    trail=list(self._trails[tid]),
-                ))
+                vehicles.append(
+                    TrackedVehicle(
+                        track_id=tid,
+                        bbox=xyxy,
+                        class_id=cls_id,
+                        class_name=COCO_VEHICLE_NAMES.get(cls_id, "unknown"),
+                        confidence=float(box.conf[0]),
+                        center=(cx, cy),
+                        trail=list(self._trails[tid]),
+                    )
+                )
         return vehicles
 
     @property

@@ -4,13 +4,12 @@ import logging
 from collections import defaultdict
 from dataclasses import dataclass
 
-import cv2
-import numpy as np
-
 logger = logging.getLogger(__name__)
 
 
-def _point_to_polyline_distance(point: tuple[float, float], polyline: list[tuple[int, int]]) -> float:
+def _point_to_polyline_distance(
+    point: tuple[float, float], polyline: list[tuple[int, int]]
+) -> float:
     """Minimum distance from a point to any segment of the polyline."""
     min_dist = float("inf")
     px, py = point
@@ -47,8 +46,10 @@ def _crossed_polyline(
 
 
 def _segments_intersect(
-    p1: tuple[float, float], p2: tuple[float, float],
-    p3: tuple[int, int], p4: tuple[int, int],
+    p1: tuple[float, float],
+    p2: tuple[float, float],
+    p3: tuple[int, int],
+    p4: tuple[int, int],
 ) -> bool:
     """Check if line segment p1-p2 intersects segment p3-p4."""
     d1 = _cross(p3, p4, p1)
@@ -56,8 +57,9 @@ def _segments_intersect(
     d3 = _cross(p1, p2, p3)
     d4 = _cross(p1, p2, p4)
 
-    if ((d1 > 0 and d2 < 0) or (d1 < 0 and d2 > 0)) and \
-       ((d3 > 0 and d4 < 0) or (d3 < 0 and d4 > 0)):
+    if ((d1 > 0 and d2 < 0) or (d1 < 0 and d2 > 0)) and (
+        (d3 > 0 and d4 < 0) or (d3 < 0 and d4 > 0)
+    ):
         return True
 
     if d1 == 0 and _on_segment(p3, p4, p1):
@@ -77,8 +79,9 @@ def _cross(a, b, c) -> float:
 
 
 def _on_segment(a, b, c) -> bool:
-    return min(a[0], b[0]) <= c[0] <= max(a[0], b[0]) and \
-           min(a[1], b[1]) <= c[1] <= max(a[1], b[1])
+    return min(a[0], b[0]) <= c[0] <= max(a[0], b[0]) and min(a[1], b[1]) <= c[
+        1
+    ] <= max(a[1], b[1])
 
 
 @dataclass
@@ -112,7 +115,9 @@ class SpeedEstimator:
         self._speeds: dict[int, list[float]] = defaultdict(list)
         self._prev_pos: dict[int, tuple[float, float]] = {}
 
-    def estimate(self, track_id: int, center: tuple[float, float], timestamp: float = 0.0) -> float | None:
+    def estimate(
+        self, track_id: int, center: tuple[float, float], timestamp: float = 0.0
+    ) -> float | None:
         """Estimate speed for a tracked vehicle.
 
         Args:
@@ -141,7 +146,9 @@ class SpeedEstimator:
             if speed_kmh < 300:
                 self._speeds[track_id].append(speed_kmh)
                 if len(self._speeds[track_id]) > self.smoothing_window:
-                    self._speeds[track_id] = self._speeds[track_id][-self.smoothing_window:]
+                    self._speeds[track_id] = self._speeds[track_id][
+                        -self.smoothing_window :
+                    ]
 
             self._path1_times.pop(track_id, None)
             self._path2_times.pop(track_id, None)
@@ -156,11 +163,7 @@ class SpeedEstimator:
 
     @property
     def all_speeds(self) -> dict[int, float]:
-        return {
-            tid: sum(s) / len(s)
-            for tid, s in self._speeds.items()
-            if s
-        }
+        return {tid: sum(s) / len(s) for tid, s in self._speeds.items() if s}
 
     @property
     def average_speed(self) -> float | None:

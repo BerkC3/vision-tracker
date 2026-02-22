@@ -7,16 +7,15 @@ import time
 from pathlib import Path
 
 import cv2
-import numpy as np
 import streamlit as st
 import yaml
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.tracker import VehicleTracker
-from core.speed_estimator import SpeedEstimator
-from core.violation import LaneViolationDetector
-from utils.drawing import OverlayRenderer
+from core.tracker import VehicleTracker  # noqa: E402
+from core.speed_estimator import SpeedEstimator  # noqa: E402
+from core.violation import LaneViolationDetector  # noqa: E402
+from utils.drawing import OverlayRenderer  # noqa: E402
 
 st.set_page_config(page_title="Vision-Track AI", page_icon="🚗", layout="wide")
 
@@ -28,7 +27,9 @@ def load_config() -> dict:
 
 
 @st.cache_resource
-def get_tracker(model_path: str, confidence: float, device: str, classes: list[int], imgsz: int) -> VehicleTracker:
+def get_tracker(
+    model_path: str, confidence: float, device: str, classes: list[int], imgsz: int
+) -> VehicleTracker:
     return VehicleTracker(
         model_path=model_path,
         confidence=confidence,
@@ -53,7 +54,9 @@ def main() -> None:
         video_source = None
 
         if source_type == "Upload":
-            video_file = st.file_uploader("Upload Video", type=["mp4", "avi", "mov", "mkv"])
+            video_file = st.file_uploader(
+                "Upload Video", type=["mp4", "avi", "mov", "mkv"]
+            )
         elif source_type == "Webcam":
             video_source = 0
         else:
@@ -61,12 +64,22 @@ def main() -> None:
 
         st.divider()
         st.subheader("Detection")
-        confidence = st.slider("Confidence", 0.1, 1.0, config["model"]["confidence"], 0.05)
+        confidence = st.slider(
+            "Confidence", 0.1, 1.0, config["model"]["confidence"], 0.05
+        )
         model_size = st.selectbox(
             "Model",
             [
-                "yolo11n.pt", "yolo11s.pt", "yolo11m.pt", "yolo11l.pt", "yolo11x.pt",
-                "yolov8n.pt", "yolov8s.pt", "yolov8m.pt", "yolov8l.pt", "yolov8x.pt",
+                "yolo11n.pt",
+                "yolo11s.pt",
+                "yolo11m.pt",
+                "yolo11l.pt",
+                "yolo11x.pt",
+                "yolov8n.pt",
+                "yolov8s.pt",
+                "yolov8m.pt",
+                "yolov8l.pt",
+                "yolov8x.pt",
             ],
             help="YOLO11 (recommended) or YOLOv8. Larger models are more accurate but slower.",
         )
@@ -74,10 +87,19 @@ def main() -> None:
 
         st.divider()
         st.subheader("Speed Lines")
-        st.info("In CLI mode, lines are drawn interactively on the video. Here, use Y-ratio sliders as horizontal lines.")
-        line1_ratio = st.slider("Line 1 Y-Position", 0.1, 0.9, config["speed"]["line1_y_ratio"], 0.05)
-        line2_ratio = st.slider("Line 2 Y-Position", 0.1, 0.9, config["speed"]["line2_y_ratio"], 0.05)
-        real_distance = st.number_input("Distance between lines (m)", 1.0, 100.0, config["speed"]["real_distance_m"])
+        st.info(
+            "In CLI mode, lines are drawn interactively on the video. "
+            "Here, use Y-ratio sliders as horizontal lines."
+        )
+        line1_ratio = st.slider(
+            "Line 1 Y-Position", 0.1, 0.9, config["speed"]["line1_y_ratio"], 0.05
+        )
+        line2_ratio = st.slider(
+            "Line 2 Y-Position", 0.1, 0.9, config["speed"]["line2_y_ratio"], 0.05
+        )
+        real_distance = st.number_input(
+            "Distance between lines (m)", 1.0, 100.0, config["speed"]["real_distance_m"]
+        )
 
         st.divider()
         st.subheader("ROI (Lane Violation)")
@@ -103,7 +125,13 @@ def main() -> None:
         show_trails = st.checkbox("Show trails", config["display"]["show_trails"])
         show_speed = st.checkbox("Show speed", config["display"]["show_speed"])
         show_roi = st.checkbox("Show ROI", config["display"]["show_roi"])
-        stats_opacity = st.slider("Stats panel opacity", 0.1, 0.8, config["display"].get("stats_opacity", 0.35), 0.05)
+        stats_opacity = st.slider(
+            "Stats panel opacity",
+            0.1,
+            0.8,
+            config["display"].get("stats_opacity", 0.35),
+            0.05,
+        )
 
     col_video, col_stats = st.columns([3, 1])
 
@@ -119,7 +147,9 @@ def main() -> None:
     with col_video:
         frame_placeholder = st.empty()
 
-    start_btn = st.sidebar.button("▶ Start Processing", type="primary", use_container_width=True)
+    start_btn = st.sidebar.button(
+        "▶ Start Processing", type="primary", use_container_width=True
+    )
 
     if not start_btn:
         st.info("Upload a video or select a source, then click **Start Processing**.")
@@ -136,7 +166,9 @@ def main() -> None:
     elif isinstance(video_source, str) and video_source:
         result = subprocess.run(
             ["yt-dlp", "-f", "best[height<=720]", "-g", video_source],
-            capture_output=True, text=True, timeout=30,
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
         if result.returncode == 0:
             cap = cv2.VideoCapture(result.stdout.strip())
@@ -155,7 +187,13 @@ def main() -> None:
     path1 = [(0, int(h * line1_ratio)), (w, int(h * line1_ratio))]
     path2 = [(0, int(h * line2_ratio)), (w, int(h * line2_ratio))]
 
-    tracker = get_tracker(model_size, confidence, config["model"]["device"], config["model"]["classes"], imgsz)
+    tracker = get_tracker(
+        model_size,
+        confidence,
+        config["model"]["device"],
+        config["model"]["classes"],
+        imgsz,
+    )
     tracker.reset()
 
     speed_est = SpeedEstimator(path1, path2, real_distance)
@@ -190,8 +228,14 @@ def main() -> None:
             speed = speed_est.estimate(v.track_id, v.center, timestamp=video_timestamp)
             violation = violation_det.check(v.track_id, v.center, v.class_name, frame)
             renderer.draw_vehicle(
-                frame, v.bbox, v.track_id, v.class_name, v.confidence,
-                speed=speed, trail=v.trail, is_violating=violation is not None,
+                frame,
+                v.bbox,
+                v.track_id,
+                v.class_name,
+                v.confidence,
+                speed=speed,
+                trail=v.trail,
+                is_violating=violation is not None,
             )
 
         frame_count += 1
@@ -207,19 +251,26 @@ def main() -> None:
         )
 
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        frame_placeholder.image(frame_rgb, channels="RGB", use_container_width=True)
+        frame_placeholder.image(frame_rgb, channels="RGB", width="stretch")
 
         total_placeholder.metric("Total Vehicles", tracker.total_unique_vehicles)
         avg_spd = speed_est.average_speed
-        speed_placeholder.metric("Avg Speed", f"{avg_spd:.1f} km/h" if avg_spd else "--")
+        speed_placeholder.metric(
+            "Avg Speed", f"{avg_spd:.1f} km/h" if avg_spd else "--"
+        )
         violation_placeholder.metric("Violations", violation_det.violation_count)
         fps_placeholder.metric("FPS", f"{fps:.1f}")
 
         if total_frames > 0:
-            progress_placeholder.progress(frame_count / total_frames, text=f"Frame {frame_count}/{total_frames}")
+            progress_placeholder.progress(
+                frame_count / total_frames, text=f"Frame {frame_count}/{total_frames}"
+            )
 
     cap.release()
-    st.success(f"Processing complete! {frame_count} frames | {tracker.total_unique_vehicles} vehicles detected")
+    st.success(
+        f"Processing complete! {frame_count} frames "
+        f"| {tracker.total_unique_vehicles} vehicles detected"
+    )
 
 
 if __name__ == "__main__":

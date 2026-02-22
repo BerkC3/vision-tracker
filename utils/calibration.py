@@ -14,12 +14,15 @@ def _enable_dpi_awareness() -> None:
     if sys.platform == "win32":
         try:
             import ctypes
+
             ctypes.windll.shcore.SetProcessDpiAwareness(2)  # per-monitor DPI aware
         except Exception:
             pass
 
 
-def _fit_display(frame: np.ndarray, max_w: int = 1920, max_h: int = 1080) -> tuple[np.ndarray, float]:
+def _fit_display(
+    frame: np.ndarray, max_w: int = 1920, max_h: int = 1080
+) -> tuple[np.ndarray, float]:
     """Resize frame to fit display, return (resized_frame, scale_factor).
 
     Defaults to 1920×1080 so that a standard 1080p source uses scale=1.0,
@@ -83,8 +86,15 @@ class PathCalibrator:
             for i, p in enumerate(self._path1):
                 dp = self._to_disp(p)
                 cv2.circle(self._display, dp, 6, (0, 255, 0), -1)
-                cv2.putText(self._display, str(i + 1), (dp[0] + 8, dp[1] - 8),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
+                cv2.putText(
+                    self._display,
+                    str(i + 1),
+                    (dp[0] + 8, dp[1] - 8),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.4,
+                    (0, 255, 0),
+                    1,
+                )
 
         # Path 2 (orange)
         if self._path2:
@@ -93,8 +103,15 @@ class PathCalibrator:
             for i, p in enumerate(self._path2):
                 dp = self._to_disp(p)
                 cv2.circle(self._display, dp, 6, (0, 140, 255), -1)
-                cv2.putText(self._display, str(i + 1), (dp[0] + 8, dp[1] - 8),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 140, 255), 1)
+                cv2.putText(
+                    self._display,
+                    str(i + 1),
+                    (dp[0] + 8, dp[1] - 8),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.4,
+                    (0, 140, 255),
+                    1,
+                )
 
     def _draw_instructions(self, img: np.ndarray) -> None:
         h, w = img.shape[:2]
@@ -114,16 +131,46 @@ class PathCalibrator:
         cv2.addWeighted(overlay, 0.7, img, 0.3, 0, img)
 
         y0 = pad + line_h
-        cv2.putText(img, "SPEED PATH CALIBRATION", (pad, y0),
-                    cv2.FONT_HERSHEY_SIMPLEX, font_title, (0, 255, 255), thick_title)
-        cv2.putText(img, "Left-click: draw PATH 1 (start zone) - green", (pad, y0 + line_h),
-                    cv2.FONT_HERSHEY_SIMPLEX, font_body, (0, 255, 0), thick_body)
-        cv2.putText(img, "Right-click: draw PATH 2 (end zone) - orange", (pad, y0 + line_h * 2),
-                    cv2.FONT_HERSHEY_SIMPLEX, font_body, (0, 140, 255), thick_body)
-        cv2.putText(img, "'c' = confirm  |  'r' = reset  |  'q' = skip (use defaults)", (pad, y0 + line_h * 3),
-                    cv2.FONT_HERSHEY_SIMPLEX, font_hint, (200, 200, 200), thick_body)
+        cv2.putText(
+            img,
+            "SPEED PATH CALIBRATION",
+            (pad, y0),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            font_title,
+            (0, 255, 255),
+            thick_title,
+        )
+        cv2.putText(
+            img,
+            "Left-click: draw PATH 1 (start zone) - green",
+            (pad, y0 + line_h),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            font_body,
+            (0, 255, 0),
+            thick_body,
+        )
+        cv2.putText(
+            img,
+            "Right-click: draw PATH 2 (end zone) - orange",
+            (pad, y0 + line_h * 2),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            font_body,
+            (0, 140, 255),
+            thick_body,
+        )
+        cv2.putText(
+            img,
+            "'c' = confirm  |  'r' = reset  |  'q' = skip (use defaults)",
+            (pad, y0 + line_h * 3),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            font_hint,
+            (200, 200, 200),
+            thick_body,
+        )
 
-    def calibrate(self, frame: np.ndarray, max_w: int = 1920, max_h: int = 1080) -> tuple[list[tuple[int, int]], list[tuple[int, int]]] | None:
+    def calibrate(
+        self, frame: np.ndarray, max_w: int = 1920, max_h: int = 1080
+    ) -> tuple[list[tuple[int, int]], list[tuple[int, int]]] | None:
         _enable_dpi_awareness()
         self._max_w = max_w
         self._max_h = max_h
@@ -155,25 +202,33 @@ class PathCalibrator:
                     break
                 else:
                     h = self._display.shape[0]
-                    cv2.putText(self._display, "Need at least 2 points per path!",
-                                (10, h - 20), cv2.FONT_HERSHEY_SIMPLEX,
-                                0.7, (0, 0, 255), 2)
+                    cv2.putText(
+                        self._display,
+                        "Need at least 2 points per path!",
+                        (10, h - 20),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.7,
+                        (0, 0, 255),
+                        2,
+                    )
 
             elif key == ord("q"):
                 cv2.destroyWindow(win)
                 return None
 
         cv2.destroyWindow(win)
-        logger.info(f"Path 1: {len(self._path1)} points | Path 2: {len(self._path2)} points")
+        logger.info(
+            f"Path 1: {len(self._path1)} points | Path 2: {len(self._path2)} points"
+        )
         return list(self._path1), list(self._path2)
 
 
 ROI_COLORS = [
-    (255, 100, 0),   # blue-orange
-    (0, 100, 255),   # red-orange
-    (100, 255, 0),   # green-ish
-    (255, 0, 200),   # pink
-    (0, 255, 200),   # cyan
+    (255, 100, 0),  # blue-orange
+    (0, 100, 255),  # red-orange
+    (100, 255, 0),  # green-ish
+    (255, 0, 200),  # pink
+    (0, 255, 200),  # cyan
 ]
 
 
@@ -227,7 +282,13 @@ class ROICalibrator:
         # Draw current ROI in progress
         if self._current_points:
             ci = len(self._completed)
-            self._draw_polygon(self._display, self._current_points, self._color(ci), ci + 1, closed=False)
+            self._draw_polygon(
+                self._display,
+                self._current_points,
+                self._color(ci),
+                ci + 1,
+                closed=False,
+            )
 
     def _draw_instructions(self, img: np.ndarray) -> None:
         h, w = img.shape[:2]
@@ -246,19 +307,57 @@ class ROICalibrator:
         cv2.addWeighted(overlay, 0.7, img, 0.3, 0, img)
 
         count = len(self._completed)
-        title = f"ROI SETUP - {count} zone(s) defined" if count else "ROI SETUP (Restricted Zones)"
+        title = (
+            f"ROI SETUP - {count} zone(s) defined"
+            if count
+            else "ROI SETUP (Restricted Zones)"
+        )
         y0 = pad + line_h
-        cv2.putText(img, title, (pad, y0),
-                    cv2.FONT_HERSHEY_SIMPLEX, font_title, (0, 255, 255), thick_title)
-        cv2.putText(img, "Left-click: add points  |  Right-click: finish polygon", (pad, y0 + line_h),
-                    cv2.FONT_HERSHEY_SIMPLEX, font_body, (255, 100, 0), thick_body)
-        cv2.putText(img, "'n' = new ROI  |  'r' = reset current  |  'c' = confirm all", (pad, y0 + line_h * 2),
-                    cv2.FONT_HERSHEY_SIMPLEX, font_body, (200, 200, 200), thick_body)
-        cv2.putText(img, "'q' = skip (no ROI)", (pad, y0 + line_h * 3),
-                    cv2.FONT_HERSHEY_SIMPLEX, font_body, (150, 150, 150), thick_body)
+        cv2.putText(
+            img,
+            title,
+            (pad, y0),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            font_title,
+            (0, 255, 255),
+            thick_title,
+        )
+        cv2.putText(
+            img,
+            "Left-click: add points  |  Right-click: finish polygon",
+            (pad, y0 + line_h),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            font_body,
+            (255, 100, 0),
+            thick_body,
+        )
+        cv2.putText(
+            img,
+            "'n' = new ROI  |  'r' = reset current  |  'c' = confirm all",
+            (pad, y0 + line_h * 2),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            font_body,
+            (200, 200, 200),
+            thick_body,
+        )
+        cv2.putText(
+            img,
+            "'q' = skip (no ROI)",
+            (pad, y0 + line_h * 3),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            font_body,
+            (150, 150, 150),
+            thick_body,
+        )
 
-    def _draw_polygon(self, img: np.ndarray, points: list[tuple[int, int]],
-                       color: tuple[int, int, int], label_num: int, closed: bool = True) -> None:
+    def _draw_polygon(
+        self,
+        img: np.ndarray,
+        points: list[tuple[int, int]],
+        color: tuple[int, int, int],
+        label_num: int,
+        closed: bool = True,
+    ) -> None:
         disp_pts = [self._to_disp(p) for p in points]
         for i, dp in enumerate(disp_pts):
             cv2.circle(img, dp, 5, color, -1)
@@ -271,10 +370,19 @@ class ROICalibrator:
                 cv2.fillPoly(overlay, [pts_arr], color)
                 cv2.addWeighted(overlay, 0.2, img, 0.8, 0, img)
             cv2.polylines(img, [pts_arr], closed, color, 2)
-            cv2.putText(img, f"ROI #{label_num}", (disp_pts[0][0] + 8, disp_pts[0][1] - 10),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+            cv2.putText(
+                img,
+                f"ROI #{label_num}",
+                (disp_pts[0][0] + 8, disp_pts[0][1] - 10),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.5,
+                color,
+                2,
+            )
 
-    def calibrate(self, frame: np.ndarray, max_w: int = 1920, max_h: int = 1080) -> list[list[list[int]]] | None:
+    def calibrate(
+        self, frame: np.ndarray, max_w: int = 1920, max_h: int = 1080
+    ) -> list[list[list[int]]] | None:
         """Returns list of polygons: [[[x,y], [x,y], ...], [...], ...]"""
         _enable_dpi_awareness()
         self._max_w = max_w
@@ -323,8 +431,15 @@ class ROICalibrator:
                     break
                 # Flash warning
                 h = self._display.shape[0]
-                cv2.putText(self._display, "Draw at least one ROI (3+ points)!",
-                            (10, h - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+                cv2.putText(
+                    self._display,
+                    "Draw at least one ROI (3+ points)!",
+                    (10, h - 20),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.7,
+                    (0, 0, 255),
+                    2,
+                )
 
             elif key == ord("q"):
                 cv2.destroyWindow(win)
