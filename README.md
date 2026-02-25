@@ -44,7 +44,7 @@ configs/
   settings.yaml         All tunable parameters
 
 tests/
-  test_database.py      Unit tests — database layer (66 tests total)
+  test_database.py      Unit tests — database layer (74 tests total)
   test_speed.py         Unit tests — speed estimator
   test_violation.py     Unit tests — violation detector
 
@@ -236,7 +236,7 @@ pytest tests/ --cov=core --cov-report=term-missing
 pytest tests/test_database.py -v
 ```
 
-The test suite has **66 tests** covering the database layer, speed estimator, and violation detector. All tests run on CPU without a GPU.
+The test suite has **74 tests** covering the database layer, speed estimator, and violation detector. All tests run on CPU without a GPU.
 
 ## Tech Stack
 

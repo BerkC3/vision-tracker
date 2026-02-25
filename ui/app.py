@@ -87,7 +87,7 @@ def main() -> None:
                 "yolov8l.pt",
                 "yolov8x.pt",
             ],
-            help="YOLO11 (recommended) or YOLOv8. Larger models are more accurate but slower.",
+            help="YOLO11 or YOLOv8. Larger models are more accurate but slower.",
         )
         imgsz = st.selectbox("Inference Resolution", [640, 1280, 1920], index=2)
 

@@ -178,7 +178,8 @@ class TestInitDb:
         with mem_db.connect() as conn:
             result = conn.execute(
                 text(
-                    "SELECT name FROM sqlite_master WHERE type='table' AND name='violations'"
+                    "SELECT name FROM sqlite_master"
+                    " WHERE type='table' AND name='violations'"
                 )
             ).fetchone()
         assert result is not None
