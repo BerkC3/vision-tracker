@@ -117,6 +117,54 @@ class TestBuildEngine:
 
 
 # ---------------------------------------------------------------------------
+# Lazy singleton initialisation
+# ---------------------------------------------------------------------------
+
+
+class TestLazyInit:
+    """Verify the lazy singleton pattern for _engine and _SessionFactory."""
+
+    def test_get_engine_returns_same_instance(self, tmp_path, monkeypatch) -> None:
+        """_get_engine() must return the same engine on subsequent calls."""
+        url = f"sqlite:///{tmp_path}/lazy.db"
+        monkeypatch.setattr(db_mod, "DATABASE_URL", url)
+        monkeypatch.setattr(db_mod, "_engine", None)
+
+        engine1 = db_mod._get_engine()
+        engine2 = db_mod._get_engine()
+        assert engine1 is engine2
+
+    def test_get_session_factory_returns_same_instance(
+        self, tmp_path, monkeypatch
+    ) -> None:
+        """_get_session_factory() must return the same factory on subsequent calls."""
+        url = f"sqlite:///{tmp_path}/lazy_sf.db"
+        monkeypatch.setattr(db_mod, "DATABASE_URL", url)
+        monkeypatch.setattr(db_mod, "_engine", None)
+        monkeypatch.setattr(db_mod, "_SessionFactory", None)
+
+        f1 = db_mod._get_session_factory()
+        f2 = db_mod._get_session_factory()
+        assert f1 is f2
+
+    def test_engine_not_created_on_import(self, monkeypatch) -> None:
+        """Module-level _engine must be None (lazy); only created on first use."""
+        monkeypatch.setattr(db_mod, "_engine", None)
+        monkeypatch.setattr(db_mod, "_SessionFactory", None)
+        # After monkeypatch, no engine should exist
+        assert db_mod._engine is None
+        assert db_mod._SessionFactory is None
+
+    def test_monkeypatch_overrides_lazy_init(self, monkeypatch) -> None:
+        """When a test sets _engine via monkeypatch, _get_engine() must use it
+        — not build a new one.  This verifies backward-compat with existing tests."""
+        sentinel_engine = create_engine("sqlite:///:memory:")
+        monkeypatch.setattr(db_mod, "_engine", sentinel_engine)
+
+        assert db_mod._get_engine() is sentinel_engine
+
+
+# ---------------------------------------------------------------------------
 # init_db
 # ---------------------------------------------------------------------------
 

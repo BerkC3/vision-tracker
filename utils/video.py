@@ -78,6 +78,11 @@ class VideoSource:
                 break
             yield frame
 
+    def seek_start(self) -> None:
+        """Seek back to the first frame. No-op for live/stream sources."""
+        if self._cap is not None:
+            self._cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+
     def release(self) -> None:
         if self._cap:
             self._cap.release()

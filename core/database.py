@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import os
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Generator
 
@@ -79,7 +79,7 @@ class ViolationRecord(Base):
     timestamp = Column(
         DateTime,
         nullable=False,
-        default=datetime.utcnow,
+        default=lambda: datetime.now(timezone.utc),
         index=True,
     )
     track_id = Column(Integer, nullable=False, index=True)
@@ -132,9 +132,27 @@ def _build_engine():
     return engine
 
 
-# Module-level singletons — instantiated once at import time.
-_engine = _build_engine()
-_SessionFactory = sessionmaker(bind=_engine, expire_on_commit=False)
+# Module-level singletons — lazily instantiated on first use.
+# This prevents importing the module from triggering DB engine creation
+# (important for tests and modules that only need the ORM model class).
+_engine = None
+_SessionFactory = None
+
+
+def _get_engine():
+    """Return the singleton engine, building it on first call."""
+    global _engine
+    if _engine is None:
+        _engine = _build_engine()
+    return _engine
+
+
+def _get_session_factory():
+    """Return the singleton session factory, building it on first call."""
+    global _SessionFactory
+    if _SessionFactory is None:
+        _SessionFactory = sessionmaker(bind=_get_engine(), expire_on_commit=False)
+    return _SessionFactory
 
 
 # ---------------------------------------------------------------------------
@@ -154,7 +172,7 @@ def init_db() -> None:
         db_file = Path(DATABASE_URL[len("sqlite:///") :])
         db_file.parent.mkdir(parents=True, exist_ok=True)
 
-    Base.metadata.create_all(bind=_engine)
+    Base.metadata.create_all(bind=_get_engine())
 
 
 @contextmanager
@@ -170,7 +188,7 @@ def get_session() -> Generator[Session, None, None]:
     The session is always closed in the ``finally`` block, so it is safe
     to use this inside a long-running loop.
     """
-    session: Session = _SessionFactory()
+    session: Session = _get_session_factory()()
     try:
         yield session
         session.commit()

@@ -60,6 +60,7 @@ class LaneViolationDetector:
         roi_polygons: list[list[list[int]]] | None = None,
         save_snapshots: bool = True,
         use_database: bool = True,
+        max_events: int = 500,
     ) -> None:
         self._polygons: list[np.ndarray] = []
         if roi_polygons:
@@ -68,10 +69,12 @@ class LaneViolationDetector:
 
         self.save_snapshots = save_snapshots
         self.use_database = use_database
+        self._max_events = max_events
 
         # Permanent per-(track_id, roi_index) tracking — each pair fires exactly once.
         self._violated: dict[int, set[int]] = defaultdict(set)
         self._violations: list[ViolationEvent] = []
+        self._total_count: int = 0
 
         # Ensure the violations table exists before the first write.
         if use_database:
@@ -132,7 +135,7 @@ class LaneViolationDetector:
 
     @property
     def violation_count(self) -> int:
-        return len(self._violations)
+        return self._total_count
 
     # ------------------------------------------------------------------
     # Detection logic
@@ -188,6 +191,11 @@ class LaneViolationDetector:
             frame_snapshot=snapshot,
         )
         self._violations.append(event)
+        self._total_count += 1
+        # Cap the in-memory list to prevent unbounded growth (each event may
+        # hold a full-frame snapshot).  The database keeps all records.
+        if len(self._violations) > self._max_events:
+            self._violations.pop(0)
         self._save_to_db(event)
 
         logger.warning(
@@ -202,3 +210,4 @@ class LaneViolationDetector:
         """Clear all in-memory state (DB rows are unaffected)."""
         self._violated.clear()
         self._violations.clear()
+        self._total_count = 0

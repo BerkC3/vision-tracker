@@ -22,17 +22,23 @@ st.set_page_config(page_title="Vision-Track AI", page_icon="🚗", layout="wide"
 
 def load_config() -> dict:
     config_path = Path(__file__).parent.parent / "configs" / "settings.yaml"
-    with open(config_path) as f:
+    with open(config_path, encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 
 @st.cache_resource
 def get_tracker(
-    model_path: str, confidence: float, device: str, classes: list[int], imgsz: int
+    model_path: str,
+    confidence: float,
+    iou_threshold: float,
+    device: str,
+    classes: list[int],
+    imgsz: int,
 ) -> VehicleTracker:
     return VehicleTracker(
         model_path=model_path,
         confidence=confidence,
+        iou_threshold=iou_threshold,
         device=device,
         classes=classes,
         imgsz=imgsz,
@@ -156,24 +162,30 @@ def main() -> None:
         return
 
     cap = None
+    tmp_path = None
     if video_file is not None:
         tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
         tmp.write(video_file.read())
         tmp.close()
-        cap = cv2.VideoCapture(tmp.name)
+        tmp_path = Path(tmp.name)
+        cap = cv2.VideoCapture(str(tmp_path))
     elif video_source == 0:
         cap = cv2.VideoCapture(0)
     elif isinstance(video_source, str) and video_source:
-        result = subprocess.run(
-            ["yt-dlp", "-f", "best[height<=720]", "-g", video_source],
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
-        if result.returncode == 0:
-            cap = cv2.VideoCapture(result.stdout.strip())
-        else:
-            st.error(f"yt-dlp failed: {result.stderr}")
+        try:
+            result = subprocess.run(
+                ["yt-dlp", "-f", "best[height<=720]", "-g", video_source],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            if result.returncode == 0:
+                cap = cv2.VideoCapture(result.stdout.strip())
+            else:
+                st.error(f"yt-dlp failed: {result.stderr}")
+                return
+        except FileNotFoundError:
+            st.error("yt-dlp not installed. Run: pip install yt-dlp")
             return
 
     if cap is None or not cap.isOpened():
@@ -190,6 +202,7 @@ def main() -> None:
     tracker = get_tracker(
         model_size,
         confidence,
+        config["model"]["iou_threshold"],
         config["model"]["device"],
         config["model"]["classes"],
         imgsz,
@@ -251,7 +264,7 @@ def main() -> None:
         )
 
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        frame_placeholder.image(frame_rgb, channels="RGB", width="stretch")
+        frame_placeholder.image(frame_rgb, channels="RGB", use_container_width=True)
 
         total_placeholder.metric("Total Vehicles", tracker.total_unique_vehicles)
         avg_spd = speed_est.average_speed
@@ -267,6 +280,8 @@ def main() -> None:
             )
 
     cap.release()
+    if tmp_path is not None:
+        tmp_path.unlink(missing_ok=True)
     st.success(
         f"Processing complete! {frame_count} frames "
         f"| {tracker.total_unique_vehicles} vehicles detected"

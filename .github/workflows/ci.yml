@@ -39,20 +39,19 @@ jobs:
           cache: "pip"
 
       - name: Install linters
-        run: pip install black>=23.0 "flake8>=6.0"
+        run: pip install "black>=23.0" "flake8>=6.0"
 
       # black --check exits with a non-zero code if any file would be
       # reformatted, making the CI step fail without modifying any files.
       - name: black — check formatting
         run: black --check --diff .
 
-      # flake8 enforces PEP-8 with a slightly relaxed line length (100 chars)
-      # to align with the black default.  E203/W503 are disabled because they
-      # conflict with black's style.
+      # flake8 enforces PEP-8 with the same line length as black (88 chars).
+      # E203/W503 are disabled because they conflict with black's style.
       - name: flake8 — check style
         run: |
           flake8 . \
-            --max-line-length=100 \
+            --max-line-length=88 \
             --extend-ignore=E203,W503 \
             --exclude=.git,__pycache__,.venv,outputs,tracker
 

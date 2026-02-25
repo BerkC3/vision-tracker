@@ -5,10 +5,9 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 
 import numpy as np
-import torch
 from ultralytics import YOLO
 
-from .detector import COCO_VEHICLE_NAMES
+from .detector import COCO_VEHICLE_NAMES, resolve_device
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +35,7 @@ class VehicleTracker:
         trail_length: int = 30,
         imgsz: int = 1920,
     ) -> None:
-        self.device = self._resolve_device(device)
+        self.device = resolve_device(device)
         self.model = YOLO(model_path)
         self.model.to(self.device)
         self.confidence = confidence
@@ -50,24 +49,6 @@ class VehicleTracker:
         logger.info(
             f"Tracker ready on {self.device} | imgsz={imgsz} | tracker={tracker_config}"
         )
-
-    @staticmethod
-    def _resolve_device(device: str) -> str:
-        if device == "auto":
-            if torch.cuda.is_available():
-                gpu_name = torch.cuda.get_device_name(0)
-                vram = torch.cuda.get_device_properties(0).total_memory / 1024**3
-                logger.info(f"GPU detected: {gpu_name} ({vram:.1f} GB VRAM)")
-                return "cuda:0"
-            logger.warning(
-                "CUDA not available! Running on CPU - expect slow performance."
-            )
-            logger.warning(
-                "Install CUDA torch: pip install torch torchvision "
-                "--index-url https://download.pytorch.org/whl/cu124"
-            )
-            return "cpu"
-        return device
 
     def update(self, frame: np.ndarray) -> list[TrackedVehicle]:
         results = self.model.track(

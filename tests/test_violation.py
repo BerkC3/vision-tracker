@@ -201,6 +201,62 @@ class TestCheck:
 
 
 # ---------------------------------------------------------------------------
+# max_events cap (memory leak prevention)
+# ---------------------------------------------------------------------------
+
+
+class TestMaxEventsCap:
+    """Verify that the in-memory _violations list is capped at max_events while
+    _total_count continues to reflect the true number of violations recorded."""
+
+    def test_list_capped_at_max_events(self) -> None:
+        """When violations exceed max_events, the oldest are evicted."""
+        d = LaneViolationDetector(
+            roi_polygons=[SQUARE], use_database=False, max_events=3
+        )
+        for i in range(5):
+            d.check(i, (50.0, 50.0), "car")
+
+        assert len(d.violations) == 3
+        # Only the 3 most recent events remain.
+        assert [e.track_id for e in d.violations] == [2, 3, 4]
+
+    def test_total_count_exceeds_list_length(self) -> None:
+        """violation_count must reflect total violations, not just the list size."""
+        d = LaneViolationDetector(
+            roi_polygons=[SQUARE], use_database=False, max_events=2
+        )
+        for i in range(5):
+            d.check(i, (50.0, 50.0), "car")
+
+        assert d.violation_count == 5
+        assert len(d.violations) == 2
+
+    def test_no_eviction_within_limit(self) -> None:
+        """When violations stay within max_events, nothing is evicted."""
+        d = LaneViolationDetector(
+            roi_polygons=[SQUARE], use_database=False, max_events=10
+        )
+        for i in range(5):
+            d.check(i, (50.0, 50.0), "car")
+
+        assert d.violation_count == 5
+        assert len(d.violations) == 5
+
+    def test_reset_clears_total_count(self) -> None:
+        """reset() must zero out _total_count along with the list."""
+        d = LaneViolationDetector(
+            roi_polygons=[SQUARE], use_database=False, max_events=2
+        )
+        for i in range(5):
+            d.check(i, (50.0, 50.0), "car")
+
+        d.reset()
+        assert d.violation_count == 0
+        assert len(d.violations) == 0
+
+
+# ---------------------------------------------------------------------------
 # reset
 # ---------------------------------------------------------------------------
 

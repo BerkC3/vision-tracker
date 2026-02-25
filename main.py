@@ -24,7 +24,7 @@ logger = logging.getLogger("vision-track")
 
 
 def load_config(path: str) -> dict:
-    with open(path) as f:
+    with open(path, encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 
@@ -105,12 +105,13 @@ def run(
     # ROI calibration (multiple zones)
     roi_polygons = None
     cfg_roi = viol_cfg.get("roi_polygon") or []
+    # Filter out empty sub-lists before inspecting structure.
+    cfg_roi = [p for p in cfg_roi if p] if cfg_roi else []
     if cfg_roi:
         # Config has a single polygon - wrap in list
         roi_polygons = (
             [cfg_roi]
-            if cfg_roi
-            and isinstance(cfg_roi[0], list)
+            if isinstance(cfg_roi[0], list)
             and not isinstance(cfg_roi[0][0], list)
             else cfg_roi
         )
@@ -144,17 +145,18 @@ def run(
     if output_path:
         writer = VideoWriter(output_path, video.fps, w, h)
 
-    cv2.namedWindow("Vision-Track", cv2.WINDOW_NORMAL)
-    cv2.resizeWindow("Vision-Track", min(w, max_w), min(h, max_h))
+    if show:
+        cv2.namedWindow("Vision-Track", cv2.WINDOW_NORMAL)
+        cv2.resizeWindow("Vision-Track", min(w, max_w), min(h, max_h))
+
     logger.info("Pipeline started. Press 'q' to quit.")
     frame_count = 0
     video_fps = video.fps or 25.0
     t_start = time.monotonic()
 
-    # Re-open to process from beginning
-    video.release()
-    video = VideoSource(source)
-    video.open()
+    # Seek back to start instead of releasing and re-opening (avoids issues
+    # with live streams where re-opening may produce a different stream).
+    video.seek_start()
 
     try:
         for frame in video.frames():
@@ -210,7 +212,8 @@ def run(
         video.release()
         if writer:
             writer.release()
-        cv2.destroyAllWindows()
+        if show:
+            cv2.destroyAllWindows()
         logger.info(
             f"Done. {frame_count} frames | "
             f"{tracker.total_unique_vehicles} vehicles | "
