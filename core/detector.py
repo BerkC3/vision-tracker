@@ -20,9 +20,7 @@ def resolve_device(device: str) -> str:
             vram = torch.cuda.get_device_properties(0).total_memory / 1024**3
             logger.info(f"GPU detected: {gpu_name} ({vram:.1f} GB VRAM)")
             return "cuda:0"
-        logger.warning(
-            "CUDA not available! Running on CPU - expect slow performance."
-        )
+        logger.warning("CUDA not available! Running on CPU - expect slow performance.")
         return "cpu"
     return device
 

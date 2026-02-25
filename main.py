@@ -111,8 +111,7 @@ def run(
         # Config has a single polygon - wrap in list
         roi_polygons = (
             [cfg_roi]
-            if isinstance(cfg_roi[0], list)
-            and not isinstance(cfg_roi[0][0], list)
+            if isinstance(cfg_roi[0], list) and not isinstance(cfg_roi[0][0], list)
             else cfg_roi
         )
     if not roi_polygons and show and not test_mode:
